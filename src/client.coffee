@@ -7,6 +7,8 @@ Log            = require 'log'
 HttpsProxyAgent = require 'https-proxy-agent'
 defaultPingInterval = 60000
 
+jsTOTP = require './js-totp.js'
+
 User = require './user.coffee'
 Message = require './message.coffee'
 
@@ -44,7 +46,13 @@ class Client extends EventEmitter
 
     login: ->
         @logger.info 'Logging in...'
-        @_apiCall 'POST', usersRoute + '/login', {login_id: @email, password: @password}, @_onLogin
+        authObj = {login_id: @email, password: @password}
+
+        if @options.mfaSecret
+            totp = new jsTOTP
+            authObj.token = totp.otp_now @options.mfaSecret
+
+        @_apiCall 'POST', usersRoute + '/login', authObj, @_onLogin
 
     _onLogin: (data, headers) =>
         if data
@@ -57,7 +65,19 @@ class Client extends EventEmitter
                 @authenticated = true
                 # Continue happy flow here
                 @token = headers.token
-                @socketUrl = (if useTLS then 'wss://' else 'ws://') + @host + (if (useTLS and @options.wssPort?) then ':'+@options.wssPort else (if @options.httpPort? then ':' + @options.httpPort else '')) + '/api/v4/websocket'
+
+                protocol   = if useTLS then 'wss://' else 'ws://'
+                portString =
+                    if (useTLS and @options.wssPort?)
+                        ':' + @options.wssPort
+                    else
+                        if @options.httpPort?
+                            ':' + @options.httpPort
+                        else
+                            ''
+
+                @socketUrl = protocol + @host + portString + '/api/v4/websocket'
+
                 @logger.info 'Websocket URL: ' + @socketUrl
                 @self = new User data
                 @emit 'loggedIn', @self
