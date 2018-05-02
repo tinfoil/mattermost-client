@@ -93,6 +93,7 @@ const jsTOTP = function(time_interval=30) {
 
   // https://github.com/mdp/rotp/blob/ecd702e7e8efcb36743b75bfd408c7854ed7e4f4/lib/rotp/otp.rb#L24
   function generate_otp(input, secret, padded=true) {
+    secret = secret.toLowerCase();
     var digits = 6;
     hmac = Buffer.from(
         b64_hmac_sha1(decode_base32(secret),int_to_bytestring(input)),
